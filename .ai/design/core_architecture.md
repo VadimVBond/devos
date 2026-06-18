@@ -1,84 +1,58 @@
-# Архитектура ядра DevOS (Core Architecture)
+# Архитектура DevOS: Orchestration Layer
 
-## 1. Структура проекта (Folder Structure)
+## 1. Концепция (Core Idea)
 
-Платформа строится по принципу **Modular Monolith**.
+DevOS — это **оркестрационный слой для разработки**, действующий как ядро (Kernel) между пользователем, AI и инструментами.
+
+> **Принцип:** "DevOS does not do work. DevOS orchestrates work."
+
+## 2. Архитектурные слои
+
+### 2.1 Core Engine (Kernel)
+Отвечает за логику управления:
+*   `engine/`: Координация всех процессов.
+*   `planner/`: Создание планов задач на основе интентов.
+*   `executor/`: Запуск задач через плагины.
+*   `router/`: Маршрутизация запросов.
+*   `policy/`: Проверка безопасности и прав доступа.
+
+### 2.2 AI Layer
+Абстракция над моделями ИИ:
+*   `providers/`: Адаптеры (OpenAI, Claude, Ollama, Gemini).
+*   `router/`: Выбор оптимальной модели для конкретной задачи.
+*   `prompts/`: Реестр системных промптов.
+
+### 2.3 Memory Layer
+Единая система контекста:
+*   `storage/`: Долговременная память (SQLite/SQLAlchemy).
+*   `context/`: Сессионная и проектная память.
+
+### 2.4 Tooling Layer (Plugins)
+Изолированные модули действий. Любой новый функционал = плагин.
+*   Контракт: `name`, `description`, `input_schema`, `output_schema`, `run()`.
+
+### 2.5 CLI Layer
+Первичный интерфейс взаимодействия. Вызывает Core Engine, не содержит бизнес-логики.
+
+## 3. Структура проекта
 
 ```text
-devos/
-├── .ai/                    # Документация и промпты ИИ
-│   ├── design/             # Архитектурные решения
-│   └── prompts/            # Системные промпты
-├── src/
-│   └── devos/              # Основной пакет приложения
-│       ├── core/           # Ядро системы (не зависит от модулей)
-│       │   ├── cli/        # Базовая настройка Typer
-│       │   ├── config/     # Pydantic Settings
-│       │   ├── events/     # Event Bus (Internal)
-│       │   ├── logging/    # Настройка Loguru
-│       │   └── storage/    # SQLAlchemy Engine & Session
-│       ├── modules/        # Функциональные модули
-│       │   ├── project/    # Project Registry
-│       │   ├── plugin/     # Plugin Manager
-│       │   ├── task/       # Task Manager
-│       │   └── ...         # Другие модули
-│       ├── shared/         # Общие утилиты и модели данных
-│       └── main.py         # Точка входа в CLI
-├── tests/                  # Тесты
-├── .gitignore
-├── pyproject.toml          # Настройки проекта и зависимости
-└── README.md
+src/devos/
+├── core/           # Kernel & Logic
+├── ai/             # AI Abstraction
+├── memory/         # Context & Storage
+├── plugins/        # Tools & Actions
+├── cli/            # Interface & REPL
+├── config/         # Settings
+└── shared/         # Common Utilities
 ```
 
-## 2. CLI Core Design
+## 4. Схема выполнения (Execution Pipeline)
 
-Используется **Typer** для создания иерархической структуры команд.
-
-### Базовые группы команд:
-*   `devos project`: Управление проектами в реестре.
-*   `devos plugin`: Управление плагинами.
-*   `devos task`: Мониторинг и запуск задач.
-*   `devos worker`: Управление воркерами.
-*   `devos workflow`: Работа с воркфлоу (DAG).
-*   `devos ai`: Прямое взаимодействие с ИИ роутером.
-*   `devos planner`: Создание планов выполнения.
-
-### Системные команды:
-*   `devos init`: Инициализация локальной базы данных и конфигурации.
-*   `devos doctor`: Проверка окружения (Python version, SQLite, зависимости).
-
-## 3. Storage Layer (Project Registry)
-
-Используется **SQLAlchemy 2.0+** с асинхронным драйвером для SQLite.
-
-### Базовая модель `Project`:
-*   `id`: UUID (Primary Key)
-*   `name`: String
-*   `path`: String (Absolute path to project root)
-*   `stack`: String (e.g., "Python/FastAPI")
-*   `description`: Text
-*   `tags`: JSON/String
-*   `status`: Enum (active, archived, etc.)
-*   `created_at`: DateTime
-*   `updated_at`: DateTime
-
-## 4. Конфигурация (Pydantic Settings)
-
-Настройки хранятся в `.env` файле или переменных окружения.
-
-### Основные параметры:
-*   `DEVOS_HOME`: Путь к домашней директории DevOS (по умолчанию `~/.devos`).
-*   `DATABASE_URL`: Путь к SQLite БД.
-*   `LOG_LEVEL`: Уровень логирования.
-
-## 5. Протоколы и Интерфейсы (Core Interfaces)
-
-Все модули должны следовать единым контрактам для обеспечения слабой связности.
-
-### Пример базового интерфейса модуля:
-```python
-class BaseModule:
-    def initialize(self):
-        """Регистрация команд в CLI и слушателей событий."""
-        pass
-```
+1.  **User Input** → CLI
+2.  **Intent Resolver** (AI) → Определение намерения.
+3.  **Planner** → Генерация графа задач.
+4.  **Policy Guard** → Проверка безопасности.
+5.  **Execution Engine** → Запуск плагинов.
+6.  **Memory Update** → Сохранение результата.
+7.  **Response** → Вывод пользователю.
