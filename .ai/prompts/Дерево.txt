@@ -1,0 +1,40 @@
+devos/
+│
+├── kernel/                 # 🧠 CORE (единственный brain)
+│   ├── engine.py
+│   ├── router.py
+│   ├── planner.py
+│   ├── executor.py
+│   ├── policy.py
+│   └── bootstrap.py       # init system
+│
+├── .ai/
+│   ├── providers/
+│   ├── prompts/
+│   └── llm_router.py
+│
+├── memory/
+│   ├── store.py
+│   ├── sqlite.db
+│   └── embeddings.py
+│
+├── plugins/
+│   ├── git/
+│   ├── fs/
+│   ├── system/
+│   └── registry.py       # plugin loader
+│
+├── cli/
+│   ├── main.py
+│   ├── repl.py
+│   └── commands.py
+│
+├── tests/
+│   ├── test_kernel_boot.py
+│   ├── test_plugins.py
+│   └── test_pipeline.py
+│
+├── config/
+│   └── devos.json
+│
+└── devos.py              # entrypoint

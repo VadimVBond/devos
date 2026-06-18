@@ -1,5 +1,5 @@
 import typer
-from devos.cli.commands import project, ai, task
+from cli.commands import project, ai, task
 
 app = typer.Typer(
     name="devos",
