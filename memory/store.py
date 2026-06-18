@@ -1,8 +1,10 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import String, Text, JSON, DateTime
+from typing import Any
+from sqlalchemy import String, Text, JSON, DateTime, select
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.ext.asyncio import AsyncAttrs, create_async_engine, async_sessionmaker
+from loguru import logger
 
 class Base(AsyncAttrs, DeclarativeBase):
     pass
@@ -41,3 +43,12 @@ SessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 async def init_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    logger.success("Database initialized.")
+
+async def create_session(session_name: str):
+    logger.info(f"Memory: Creating session '{session_name}'")
+    return True
+
+async def store_kv(key: str, value: Any):
+    logger.info(f"Memory: Storing {key} = {value}")
+    return True

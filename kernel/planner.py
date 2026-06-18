@@ -1,6 +1,7 @@
 import json
 from typing import List, Dict, Any
 from pydantic import BaseModel, Field
+from ai.runtime import AIRuntime
 
 class TaskStep(BaseModel):
     id: int
@@ -17,22 +18,33 @@ class ExecutionPlan(BaseModel):
 class KernelPlanner:
     """
     Детерминированный планировщик DevOS Kernel.
-    Преобразует интент пользователя в структурированный граф задач.
+    Использует AIRuntime для получения когнитивных решений.
     """
     
-    def __init__(self, prompt_path: str = ".ai/prompts/DEVOS KERNEL PROMPT.md"):
-        self.prompt_path = prompt_path
-
-    def get_system_prompt(self) -> str:
-        with open(self.prompt_path, "r", encoding="utf-8") as f:
-            return f.read()
+    def __init__(self, runtime: AIRuntime = None):
+        self.runtime = runtime or AIRuntime()
 
     async def plan(self, intent: str) -> ExecutionPlan:
-        # Здесь будет вызов AI Router для генерации плана на основе системного промпта.
-        # Пока возвращаем пустой план-заглушку.
-        return ExecutionPlan(
-            intent=intent,
-            tasks=[],
-            risk_level="low",
-            requires_confirmation=False
-        )
+        """
+        Преобразует интент пользователя в структурированный граф задач
+        используя AI Runtime и когнитивные инструкции.
+        """
+        # Вызываем AI Runtime с промптом планировщика
+        # Имя промпта совпадает с файлом в .ai/prompts/
+        try:
+            raw_plan = await self.runtime.execute_structured(
+                prompt_name="DEVOS KERNEL PROMPT", 
+                user_input=intent
+            )
+            
+            # В будущем здесь будет парсинг реального ответа от LLM в ExecutionPlan
+            return ExecutionPlan(
+                intent=intent,
+                tasks=[],
+                risk_level="low",
+                requires_confirmation=False
+            )
+        except Exception as e:
+            from loguru import logger
+            logger.error(f"Planning failed: {e}")
+            raise
