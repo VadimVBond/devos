@@ -1,24 +1,28 @@
 import json
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
 from pydantic import BaseModel, Field
 from ai.runtime import AIRuntime
 
-class TaskStep(BaseModel):
+class TaskNode(BaseModel):
     id: int
     action: str
     input: Dict[str, Any] = Field(default_factory=dict)
-    depends_on: List[int] = Field(default_factory=list)
+    max_retries: int = 0
+
+class ExecutionGraph(BaseModel):
+    nodes: List[TaskNode] = Field(default_factory=list)
+    edges: List[Tuple[int, int]] = Field(default_factory=list)  # (from_id, to_id)
 
 class ExecutionPlan(BaseModel):
     intent: str
-    tasks: List[TaskStep]
-    risk_level: str  # low | medium | high
+    graph: ExecutionGraph = Field(default_factory=ExecutionGraph)
+    risk_level: str = "low"
     requires_confirmation: bool = True
 
 class KernelPlanner:
     """
-    Детерминированный планировщик DevOS Kernel.
-    Использует AIRuntime для получения когнитивных решений.
+    Планировщик DevOS Kernel.
+    Генерирует направленный ациклический граф (DAG) задач.
     """
     
     def __init__(self, runtime: AIRuntime = None):
@@ -26,21 +30,20 @@ class KernelPlanner:
 
     async def plan(self, intent: str) -> ExecutionPlan:
         """
-        Преобразует интент пользователя в структурированный граф задач
-        используя AI Runtime и когнитивные инструкции.
+        Преобразует интент пользователя в структурированный граф задач.
         """
-        # Вызываем AI Runtime с промптом планировщика
-        # Имя промпта совпадает с файлом в .ai/prompts/
         try:
-            raw_plan = await self.runtime.execute_structured(
+            # Вызов AI Runtime для получения структуры графа
+            raw_response = await self.runtime.execute_structured(
                 prompt_name="DEVOS KERNEL PROMPT", 
                 user_input=intent
             )
             
-            # В будущем здесь будет парсинг реального ответа от LLM в ExecutionPlan
+            # В будущем здесь будет парсинг реального JSON-ответа в ExecutionPlan
+            # Пока создаем пустой граф-заглушку
             return ExecutionPlan(
                 intent=intent,
-                tasks=[],
+                graph=ExecutionGraph(nodes=[], edges=[]),
                 risk_level="low",
                 requires_confirmation=False
             )
