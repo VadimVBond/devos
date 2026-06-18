@@ -68,16 +68,24 @@ class KernelPlanner:
     def __init__(self, runtime: AIRuntime = None):
         self.runtime = runtime or AIRuntime()
 
-    async def plan(self, intent: str) -> ExecutionPlan:
+    async def plan(self, intent: str, feedback_context: Dict[str, Any] = None) -> ExecutionPlan:
         """
-        Преобразует интент пользователя в структурированный граф задач.
+        Преобразует интент пользователя в структурированный граф задач с учетом опционального feedback_context.
         """
         logger.info(f"Planning execution for intent: {intent}")
         try:
             # 1. Получение структурированного ответа от ИИ
+            # Инжектируем feedback_context как дополнительный структурированный аргумент (если поддерживается рантаймом)
+            # Либо сериализуем его в JSON и добавляем к вводу, если рантайм принимает только строку.
+            # Для сохранения чистоты архитектуры передаем его в user_input в виде JSON-структуры.
+            
+            payload = {"intent": intent}
+            if feedback_context:
+                payload["advisory_feedback"] = feedback_context
+                
             raw_response = await self.runtime.execute_structured(
                 prompt_name="DEVOS KERNEL PROMPT", 
-                user_input=intent
+                user_input=json.dumps(payload, ensure_ascii=False) if feedback_context else intent
             )
             
             # 2. Валидация и конвертация через Pydantic
