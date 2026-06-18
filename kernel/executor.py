@@ -3,6 +3,7 @@ from typing import Dict, Any, List
 from loguru import logger
 from kernel.state import ExecutionStateManager, TaskStatus
 from kernel.planner import ExecutionPlan, TaskNode
+from plugins.registry import PluginRegistry
 
 class KernelExecutor:
     """
@@ -10,8 +11,9 @@ class KernelExecutor:
     Управляет запуском задач с учетом зависимостей и повторных попыток.
     """
     
-    def __init__(self):
-        logger.info("Kernel Executor initialized.")
+    def __init__(self, registry: PluginRegistry = None):
+        self.registry = registry or PluginRegistry()
+        logger.info("Kernel Executor initialized with Plugin Registry.")
 
     async def execute_plan(self, plan: ExecutionPlan):
         """Выполняет план, обходя DAG."""
@@ -33,10 +35,9 @@ class KernelExecutor:
                     break
                 else:
                     # Если есть PENDING, но нет READY, значит мы в тупике (или ждем async)
-                    # В данной реализации мы идем последовательно.
                     break
 
-            # Запускаем готовые задачи (можно параллельно через asyncio.gather)
+            # Запускаем готовые задачи
             for task_id in ready_task_ids:
                 task_node = manager.nodes[task_id]
                 await self._run_task(task_node, manager)
@@ -55,12 +56,15 @@ class KernelExecutor:
             try:
                 logger.info(f"Executing task {task.id} ({task.action}). Attempt {attempts + 1}")
                 
-                # Симуляция вызова плагина
-                # В реальной системе здесь будет вызов через TaskRouter и PluginRegistry
-                await asyncio.sleep(0.1) 
+                # Реальный вызов плагина с передачей контекста выполнения
+                result = self.registry.execute(
+                    task.action, 
+                    task.input, 
+                    context={"task_id": task.id}
+                )
                 
                 # Успешное выполнение
-                manager.update_task_status(task.id, TaskStatus.SUCCESS, result={"status": "ok"})
+                manager.update_task_status(task.id, TaskStatus.SUCCESS, result=result)
                 return
                 
             except Exception as e:
