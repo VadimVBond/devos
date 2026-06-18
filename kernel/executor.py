@@ -16,7 +16,8 @@ class KernelExecutor:
         logger.info("Kernel Executor initialized with Plugin Registry.")
 
     async def execute_plan(self, plan: ExecutionPlan):
-        """Выполняет план, обходя DAG."""
+        """Выполняет обычный неоптимизированный план, обходя DAG."""
+        # Этот метод оставлен для обратной совместимости, если не используется Optimizer
         manager = ExecutionStateManager(
             nodes=plan.graph.nodes, 
             edges=plan.graph.edges
@@ -28,13 +29,11 @@ class KernelExecutor:
             ready_task_ids = manager.get_ready_tasks()
             
             if not ready_task_ids:
-                # Проверяем, есть ли еще задачи в работе или ожидании
                 pending_tasks = [tid for tid, status in manager.state.task_statuses.items() 
                                 if status == TaskStatus.PENDING]
                 if not pending_tasks:
                     break
                 else:
-                    # Если есть PENDING, но нет READY, значит мы в тупике (или ждем async)
                     break
 
             # Запускаем готовые задачи
@@ -44,6 +43,47 @@ class KernelExecutor:
 
         logger.success("Execution graph processing finished.")
         return manager.state
+
+    async def execute_optimized_graph(self, opt_graph):
+        """
+        Выполняет граф пакетами (batches), гарантируя детерминизм и безопасность 
+        через execute_batch (где используется asyncio.gather).
+        """
+        manager = ExecutionStateManager(
+            nodes=opt_graph.optimized_graph.nodes, 
+            edges=opt_graph.optimized_graph.edges
+        )
+        
+        logger.info("Starting optimized batch execution.")
+        
+        for batch_index, batch_task_ids in enumerate(opt_graph.execution_batches):
+            logger.info(f"Executing Batch {batch_index} with {len(batch_task_ids)} tasks.")
+            
+            # Собираем список нод для батча
+            batch_nodes = []
+            for tid in batch_task_ids:
+                node = manager.nodes.get(tid)
+                if node:
+                    batch_nodes.append(node)
+                    
+            if batch_nodes:
+                await self.execute_batch(batch_nodes, manager)
+                
+            # Проверяем, не упала ли какая-то задача в батче, если да - возможно нужно прервать
+            failed_tasks = [tid for tid in batch_task_ids if manager.state.task_statuses.get(tid) == TaskStatus.FAILED]
+            if failed_tasks:
+                logger.error(f"Batch {batch_index} failed on tasks: {failed_tasks}. Aborting execution.")
+                break
+
+        logger.success("Optimized execution graph processing finished.")
+        return manager.state
+
+    async def execute_batch(self, batch_nodes: List[TaskNode], manager: ExecutionStateManager):
+        """
+        Выполняет группу полностью независимых задач конкурентно.
+        """
+        tasks = [self._run_task(node, manager) for node in batch_nodes]
+        await asyncio.gather(*tasks)
 
     async def _run_task(self, task: TaskNode, manager: ExecutionStateManager):
         """Выполняет конкретную задачу с учетом Retry Policy."""

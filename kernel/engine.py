@@ -7,17 +7,19 @@ from plugins.registry import PluginRegistry
 from kernel.feedback import (
     KnowledgeBase, FeedbackAnalyzer, FilterLayer, ContextBuilder
 )
+from kernel.optimizer import OptimizerEngine
 
 class KernelEngine:
     """
     🧠 Главный мозг системы DevOS.
-    Pipeline Manager, координирующий Planner -> CriticEngine -> Executor -> Feedback.
+    Pipeline Manager, координирующий Planner -> CriticEngine -> Optimizer -> Executor -> Feedback.
     """
     
     def __init__(self, registry: PluginRegistry = None):
         self.registry = registry or PluginRegistry()
         self.planner = KernelPlanner()
         self.critic = CriticEngine(registry=self.registry)
+        self.optimizer = OptimizerEngine()
         self.executor = KernelExecutor(registry=self.registry)
         
         # Feedback Layer Initialization
@@ -36,7 +38,7 @@ class KernelEngine:
 
     async def run_pipeline(self, intent: str):
         """
-        Полный цикл выполнения: Интент -> План -> Критик -> Выполнение -> Анализ.
+        Полный цикл выполнения: Интент -> План -> Критик -> Оптимизатор -> Выполнение -> Анализ.
         """
         logger.info(f"--- Pipeline Started for intent: {intent} ---")
         
@@ -55,12 +57,16 @@ class KernelEngine:
             logger.error(f"Pipeline ABORTED. Critic rejected the plan. Issues: {review.issues}")
             return {"status": "aborted", "reason": "critic_rejection", "review": review}
             
-        # Устанавливаем итоговый граф (может быть модифицирован критиком)
+        # Устанавливаем итоговый граф (безопасный после критика)
         plan.graph = review.final_graph
         
-        # 3. Execution (Assuming observability wrapper is applied externally or here)
+        # 3. Execution Optimization
+        logger.info("Proceeding to optimization...")
+        opt_graph = self.optimizer.optimize(plan.graph)
+        
+        # 4. Execution
         logger.info("Proceeding to execution...")
-        result_state = await self.executor.execute_plan(plan)
+        result_state = await self.executor.execute_optimized_graph(opt_graph)
         
         # 4. Feedback Analysis (We extract dummy traces for example, but realistically it's from observability)
         # Assuming we can parse the execution state to find failed tasks:

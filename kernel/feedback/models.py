@@ -10,6 +10,8 @@ class FeedbackPattern(BaseModel):
     action: str
     reason: str
     confidence: float = Field(ge=0.0, le=1.0)
+    frequency: int = 1
+    recommended_action: str = ""
     
     # Store stringified parameters or specific keys to help matching
     context_signature: str = ""

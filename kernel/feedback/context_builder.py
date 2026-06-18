@@ -8,18 +8,23 @@ class ContextBuilder:
         if not filtered_patterns:
             return {}
 
-        context_list = []
+        signals = []
         for p in filtered_patterns:
-            context_list.append({
-                "pattern_id": p.pattern_id,
+            signals.append({
                 "type": p.type,
+                "pattern_id": p.pattern_id,
                 "severity": p.severity,
-                "action": p.action,
-                "reason": p.reason,
-                "confidence": round(p.confidence, 2)
+                "frequency": getattr(p, 'frequency', 1),
+                "confidence": round(p.confidence, 2),
+                "recommended_action": getattr(p, 'recommended_action', f"Avoid or fix action {p.action}")
             })
 
         return {
-            "feedback_context": context_list,
-            "system_directive": "These are advisory patterns based on past executions. Use them to avoid known failures."
+            "context_type": "feedback_signals",
+            "signals": signals,
+            "metadata": {
+                "source": "knowledge_base",
+                "filtered": True,
+                "top_k": len(signals)
+            }
         }
